@@ -1,0 +1,429 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using System.Threading.Tasks;
+using Firebase.Auth;
+using Google.Cloud.Firestore;
+using System.Collections.Generic;
+using Firebase.Auth.Providers;
+
+namespace SpotifityPremi_Launcher
+{
+
+
+    public static class AppSettings
+    {
+        public static string SavedEmail { get; set; } = "";
+        public static string SavedPassword { get; set; } = "";
+        public static string SavedLicense { get; set; } = "";
+        public static bool StayLoggedIn { get; set; } = false;
+    }
+
+    public partial class Form1 : Form
+    {
+        // Firebase Konfiguration
+        private readonly FirebaseAuthProvider authProvider;
+        private FirestoreDb firestoreDb;
+        private const string ApiKey = "AIzaSyCly35HVVoOW0scZuW2zWNjnzw0vK3zJzc";
+        private const string ProjectId = "geom-t";
+
+        // Speichere die aktuelle Benutzer-ID
+        private string currentUserId = null;
+
+        public Form1()
+        {
+            InitializeComponent();
+
+            // Firebase Auth Provider initialisieren
+            authProvider = new FirebaseAuthProvider(new FirebaseConfig(ApiKey));
+
+            // Firestore initialisieren
+            InitializeFirestore();
+        }
+
+        private void InitializeFirestore()
+        {
+            try
+            {
+                // Firestore-Anmeldedaten einrichten
+                // In der Produktionsversion solltest du eine JSON-Datei verwenden
+                var json = @"{
+                    ""type"": ""service_account"",
+                    ""project_id"": ""geom-t"",
+                    ""private_key_id"": ""37274411c3653eb02aba544e3468e3428a6e8301"",
+                    ""private_key"": ""-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCcHHVV7/mrzCDd\nYoIGKPe7YGll8COZG+JD3gr/Ck4aUAXDhCpvrXQKIs3aw1QdqLwhP/ixzDIkAXmf\nc2cF2SrlT+DIziehbBnaO+4dD0sXqdPpnQyTbXLUg5r4mOko1LEF0sIiFKZa62tY\nMCkLXd7pA5pO5zHNnisSGvgbnZsdl5yh9fu5m6QsuA2yXueOa29kE5TKaWmceI27\n2HNx+LrPMX4ag/kusSOTnb/5fsRlK9/zkUhvCmEDaj+ujHz+aPtXHekfdwGs/RmF\ncteoNmuQyW8mHTwmo1rsb9FXVDjR5EHlpKE7bElceDKMzwAAbgYmyhxVvDUr7eW3\nfi3c2oy3AgMBAAECggEAEGD7/pQ7Acdc+11Gfxb1RveKl2NmmL3QM4asaK3QG/qh\nYC4Rtb3hGt8j8fvka2g0tNhdY2olKJnvBMe622Y5le2Xi/n1Nn59B+SZyvq7yjPL\nRAtyMlWdYqacL9D7RYlrOU0viRvZiFiC3rHO3J5wsMnr+rNPCl+57SBfP6Z9i9Ee\nZcVUr2OeFHerP0K+EXoTMra3d/f958ROBoH380F/tgs92Q37pNr/EI6LaW3ev8Fk\nd9o2iVc15wUqbYJ0bGPdj7MtvDGKEChuW30NKbaCw67GjKi5MiWLav8v17y36ROB\nnRLuHz+1J0nzktmjJdjbnErL6OVihl76ieE1YhI84QKBgQDQWrl8fFTpebTOnOty\n13NMWijaj1lGzr+rTGmzu5WkQDlOZucz8IrnxZkUlJuHpt3d9FjBvyjWb66uQbJu\nuP8J+MQr72pSirrDnLhqeho38eMdcZCl7b4qKVo1oCfdCaiZOjn3ka3PUuMlqnEq\nNK6KxIiA8D3CkZrVq07Ni9ae1QKBgQC/z1ze+HZUiM1YvRCrgrETOTQQzewG0J5P\nMaEkfP9Y/tmpNl+viwtuKFrlxfAv4BrrKk8S10fhUQyteOG6UjXlUmi6FWtQzUea\nasK98VyE2fcQf2kS6d0XIIL2Jv6AzCB0YDCcxkTwnj3SxizDy5lNnxOVARIznf3Y\nK1HOGaE7WwKBgHAxilQIN0kJqlzfjsFmVsW0fu9B5ZcFWZyKJxkLV8b8dl9LdhA3\n5PRtKMM2SpG/PxV3sBuULg9aUDuxUL3ijCL4e9oUr7IG1g7jY0KiwV+CtwNx1awj\n2xSk89iQhya1Pr5T5kbzgR50ya/MmedaOuqqbb7QntEYysFn36U7ObSJAoGBAIUm\n90qV4tcmLJ74iLT3QeOdZ0ZvHPVSJ0PEqR/CYiSurfzokR40gRfUjd1KPkWN5kHw\nGfpzViPU9t8JtnF4lo9+WNMtAVWTW6yXhl8DSX20Le3W9OM7U861NBSa1zwj+Dex\neq2qebsrrrE9/19gXCjlUFu05aTNfaVt1Rkk86dXAoGAKnmvSIuj2gSzB7YJrM87\n22+GLx6/uUvokqyiclM8m1jDok1M40Oaec1XwKAsIJuXn8BXuazvorLRxfAAZdsE\n285LnNuc3HO13trAKH1DQLIBI9gJKeOeyEBQzfOQccR2XeZVKVR3lhmrGbU1ZYWR\nMsP5yCrqffpBnmX8gfV7aCs=\n-----END PRIVATE KEY-----\n"",
+                    ""client_email"": ""firebase-adminsdk-5x6jd@geom-t.iam.gserviceaccount.com"",
+                    ""client_id"": ""116111889338091945587"",
+                    ""auth_uri"": ""https://accounts.google.com/o/oauth2/auth"",
+                    ""token_uri"": ""https://oauth2.googleapis.com/token"",
+                    ""auth_provider_x509_cert_url"": ""https://www.googleapis.com/oauth2/v1/certs"",
+                    ""client_x509_cert_url"": ""https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-5x6jd%40geom-t.iam.gserviceaccount.com"",
+                    ""universe_domain"": ""googleapis.com""
+                }";
+
+                var credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(json);
+                firestoreDb = new FirestoreDbBuilder
+                {
+                    ProjectId = ProjectId,
+                    Credential = credential
+                }.Build();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Fehler bei der Initialisierung von Firestore: {ex.Message}",
+                    "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            // Form-Animation beim Start
+            this.Opacity = 0;
+            Timer fadeTimer = new Timer();
+            fadeTimer.Interval = 10;
+            fadeTimer.Tick += (s, args) =>
+            {
+                if (this.Opacity < 1)
+                    this.Opacity += 0.05;
+                else
+                    fadeTimer.Stop();
+            };
+            fadeTimer.Start();
+
+            // Versuche Auto-Login, falls "Stay logged in" aktiviert ist
+            CheckAutoLogin();
+        }
+
+        private async void CheckAutoLogin()
+        {
+            try
+            {
+                // Prüfe, ob gespeicherte Anmeldedaten vorhanden sind
+                string savedEmail = Properties.Settings.Default.SavedEmail;
+                string savedPassword = Properties.Settings.Default.SavedPassword;
+                string savedLicense = Properties.Settings.Default.SavedLicense;
+                bool stayLoggedIn = Properties.Settings.Default.StayLoggedIn;
+
+                if (stayLoggedIn && !string.IsNullOrEmpty(savedEmail) &&
+                    !string.IsNullOrEmpty(savedPassword) && !string.IsNullOrEmpty(savedLicense))
+                {
+                    // Versuche die Anmeldung mit gespeicherten Daten
+                    txtEmail.Text = savedEmail;
+                    txtPassword.Text = savedPassword;
+                    txtLicense.Text = savedLicense;
+                    chkStayLoggedIn.Checked = true;
+
+                    // Führe Login durch
+                    await PerformLogin();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Ignoriere Fehler beim Auto-Login
+                Console.WriteLine($"Auto-Login-Fehler: {ex.Message}");
+            }
+        }
+
+        private void txtEmail_Enter(object sender, EventArgs e)
+        {
+            if (txtEmail.Text == "Email Address")
+            {
+                txtEmail.Text = "";
+                txtEmail.ForeColor = Color.Black;
+            }
+            panelEmail.BackColor = Color.FromArgb(103, 58, 183);
+        }
+
+        private void txtEmail_Leave(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtEmail.Text))
+            {
+                txtEmail.Text = "Email Address";
+                txtEmail.ForeColor = Color.Gray;
+            }
+            panelEmail.BackColor = Color.Silver;
+        }
+
+        private void txtPassword_Enter(object sender, EventArgs e)
+        {
+            if (txtPassword.Text == "Password")
+            {
+                txtPassword.Text = "";
+                txtPassword.ForeColor = Color.Black;
+                txtPassword.UseSystemPasswordChar = true;
+            }
+            panelPassword.BackColor = Color.FromArgb(103, 58, 183);
+        }
+
+        private void txtPassword_Leave(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtPassword.Text))
+            {
+                txtPassword.Text = "Password";
+                txtPassword.ForeColor = Color.Gray;
+                txtPassword.UseSystemPasswordChar = false;
+            }
+            panelPassword.BackColor = Color.Silver;
+        }
+
+        private void txtLicense_Enter(object sender, EventArgs e)
+        {
+            if (txtLicense.Text == "License Key")
+            {
+                txtLicense.Text = "";
+                txtLicense.ForeColor = Color.Black;
+            }
+            panelLicense.BackColor = Color.FromArgb(103, 58, 183);
+        }
+
+        private void txtLicense_Leave(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtLicense.Text))
+            {
+                txtLicense.Text = "License Key";
+                txtLicense.ForeColor = Color.Gray;
+            }
+            panelLicense.BackColor = Color.Silver;
+        }
+
+        private async void btnLogin_Click(object sender, EventArgs e)
+        {
+            await PerformLogin();
+        }
+
+        private async Task PerformLogin()
+        {
+            if (!ValidateInputs()) return;
+
+            try
+            {
+                btnLogin.Enabled = false;
+                lblError.Visible = false;
+                btnLogin.Text = "Logging in...";
+
+                // 1. Mit Firebase authentifizieren
+                var authResult = await authProvider.SignInWithEmailAndPasswordAsync(
+                    txtEmail.Text, txtPassword.Text);
+
+                if (authResult == null || string.IsNullOrEmpty(authResult.User.LocalId))
+                {
+                    ShowError("Authentifizierung fehlgeschlagen");
+                    return;
+                }
+
+                // Benutzer-ID speichern
+                currentUserId = authResult.User.LocalId;
+
+                // 2. Lizenzschlüssel überprüfen
+                string licenseKey = txtLicense.Text;
+                bool isValid = await ValidateLicense(licenseKey, currentUserId);
+
+                if (!isValid)
+                {
+                    ShowError("Ungültiger oder bereits verwendeter Lizenzschlüssel");
+                    return;
+                }
+
+                // 3. Lizenz dem Benutzer zuweisen wenn noch nicht verwendet
+                await AssignLicenseToUser(licenseKey, currentUserId);
+
+                // 4. Zugangsdaten speichern, falls "Stay logged in" aktiviert ist
+                if (chkStayLoggedIn.Checked)
+                {
+                    Properties.Settings.Default.SavedEmail = txtEmail.Text;
+                    Properties.Settings.Default.SavedPassword = txtPassword.Text;
+                    Properties.Settings.Default.SavedLicense = txtLicense.Text;
+                    Properties.Settings.Default.StayLoggedIn = true;
+                    Properties.Settings.Default.Save();
+                }
+                else
+                {
+                    // Lösche gespeicherte Anmeldedaten
+                    Properties.Settings.Default.SavedEmail = "";
+                    Properties.Settings.Default.SavedPassword = "";
+                    Properties.Settings.Default.SavedLicense = "";
+                    Properties.Settings.Default.StayLoggedIn = false;
+                    Properties.Settings.Default.Save();
+                }
+
+                // 5. Zum Hauptformular wechseln
+                this.Hide();
+                new Form2().Show();
+            }
+            catch (FirebaseAuthException authEx)
+            {
+                // Firebase-Auth spezifische Fehler anzeigen
+                ShowError(GetFirebaseErrorMessage(authEx));
+            }
+            catch (Exception ex)
+            {
+                // Allgemeine Fehler
+                ShowError($"Login fehlgeschlagen: {ex.Message}");
+            }
+            finally
+            {
+                btnLogin.Enabled = true;
+                btnLogin.Text = "LOGIN";
+            }
+        }
+
+        private string GetFirebaseErrorMessage(FirebaseAuthException ex)
+        {
+            switch (ex.Reason)
+            {
+                case AuthErrorReason.UnknownEmailAddress:
+                    return "E-Mail-Adresse nicht gefunden";
+                case AuthErrorReason.WrongPassword:
+                    return "Falsches Passwort";
+                case AuthErrorReason.UserDisabled:
+                    return "Benutzerkonto deaktiviert";
+                case AuthErrorReason.TooManyAttemptsTryLater:
+                    return "Zu viele Anmeldeversuche. Bitte später erneut versuchen";
+                default:
+                    return $"Authentifizierungsfehler: {ex.Message}";
+            }
+        }
+
+        private async Task<bool> ValidateLicense(string licenseKey, string userId)
+        {
+            try
+            {
+                if (firestoreDb == null)
+                {
+                    MessageBox.Show("Firestore-Datenbank nicht initialisiert",
+                        "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return false;
+                }
+
+                // Lizenz in Firestore abfragen
+                DocumentReference licenseRef = firestoreDb.Collection("licenses").Document(licenseKey);
+                DocumentSnapshot licenseSnapshot = await licenseRef.GetSnapshotAsync();
+
+                if (!licenseSnapshot.Exists)
+                {
+                    return false; // Lizenz existiert nicht
+                }
+
+                // Lizenz-Daten abrufen
+                var licenseData = licenseSnapshot.ToDictionary();
+
+                // Prüfen, ob die Lizenz bereits verwendet wird
+                if (licenseData.TryGetValue("isUsed", out var isUsedObj) && isUsedObj is bool isUsed)
+                {
+                    if (isUsed)
+                    {
+                        // Wenn die Lizenz verwendet wird, prüfe, ob sie von diesem Benutzer verwendet wird
+                        if (licenseData.TryGetValue("generatedBy", out var generatedByObj) &&
+                            generatedByObj.ToString() == userId)
+                        {
+                            return true; // Vom gleichen Benutzer verwendet, das ist OK
+                        }
+
+                        // Prüfe, ob sie diesem Benutzer zugewiesen ist
+                        if (licenseData.TryGetValue("usedBy", out var usedByObj) &&
+                            usedByObj.ToString() == userId)
+                        {
+                            return true; // Von diesem Benutzer verwendet, das ist OK
+                        }
+
+                        return false; // Bereits von einem anderen Benutzer verwendet
+                    }
+                }
+
+                // Lizenz ist nicht verwendet oder vom selben Benutzer verwendet
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Fehler bei der Überprüfung der Lizenz: {ex.Message}",
+                    "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
+        private async Task AssignLicenseToUser(string licenseKey, string userId)
+        {
+            try
+            {
+                DocumentReference licenseRef = firestoreDb.Collection("licenses").Document(licenseKey);
+                DocumentSnapshot licenseSnapshot = await licenseRef.GetSnapshotAsync();
+
+                if (!licenseSnapshot.Exists)
+                {
+                    return; // Lizenz existiert nicht
+                }
+
+                var licenseData = licenseSnapshot.ToDictionary();
+
+                // Prüfen, ob die Lizenz bereits verwendet wird
+                bool isUsed = false;
+                if (licenseData.TryGetValue("isUsed", out var isUsedObj) && isUsedObj is bool)
+                {
+                    isUsed = (bool)isUsedObj;
+                }
+
+                // Wenn die Lizenz nicht verwendet wird, weise sie dem Benutzer zu
+                if (!isUsed)
+                {
+                    await licenseRef.UpdateAsync(new Dictionary<string, object>
+                    {
+                        { "isUsed", true },
+                        { "usedBy", userId },
+                        { "usedDate", Timestamp.GetCurrentTimestamp() }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Fehler beim Zuweisen der Lizenz: {ex.Message}",
+                    "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private bool ValidateInputs()
+        {
+            if (txtEmail.Text == "Email Address" || string.IsNullOrWhiteSpace(txtEmail.Text))
+            {
+                ShowError("Bitte E-Mail-Adresse eingeben");
+                return false;
+            }
+
+            if (txtPassword.Text == "Password" || string.IsNullOrWhiteSpace(txtPassword.Text))
+            {
+                ShowError("Bitte Passwort eingeben");
+                return false;
+            }
+
+            if (txtLicense.Text == "License Key" || string.IsNullOrWhiteSpace(txtLicense.Text))
+            {
+                ShowError("Bitte Lizenzschlüssel eingeben");
+                return false;
+            }
+
+            return true;
+        }
+
+        private void ShowError(string message)
+        {
+            lblError.Text = message;
+            lblError.Visible = true;
+
+            // Shake-Animation für Fehler
+            Point originalLocation = this.Location;
+            Random rnd = new Random();
+            for (int i = 0; i < 10; i++)
+            {
+                this.Location = new Point(
+                    originalLocation.X + rnd.Next(-5, 6),
+                    originalLocation.Y + rnd.Next(-5, 6));
+                System.Threading.Thread.Sleep(20);
+            }
+            this.Location = originalLocation;
+        }
+
+        private void lnkBuyLicense_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            System.Diagnostics.Process.Start("https://shop-spotifypremi.vercel.app");
+        }
+    }
+}
